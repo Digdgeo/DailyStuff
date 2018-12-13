@@ -49,17 +49,68 @@ def get_escenas_values(path):
 def get_hydroperiod(path, values):
     
     escenas = [i for i in os.listdir(path) if i.endswith('.tif')]
-        
+    outpath = os.path.join(path, 'output')
+    os.makedirs(outpath, exist_ok=True)
+    
     for i in sorted(escenas):
+        
         rs = os.path.join(path, i)
-        out = os.path.join(path, os.path.join('outputs', i[:-4] + '_rec.tif'))
+        #outpus
+        out_flood = os.path.join(outpath,i[:-4] + '_flood_rec.tif')
+        out_dry = os.path.join(outpath,i[:-4] + '_dry_rec.tif')
+        out_valid = os.path.join(outpath,i[:-4] + '_valid_rec.tif')
+        
         with rasterio.open(rs) as src:
             RS = src.read()
-            RS[RS == 1] = get_escenas_values('/home/diego/Ecopotential/shapes/tests/rasters/')[i[:8]]
-            print(i, RS.mean())
+            #Inudadas
+            RS_FLOOD = np.where((RS == 1), get_escenas_values(path)[i[:8]], 0)
+            print(i, RS_FLOOD.mean())
+            #Secas
+            RS_DRY = np.where((RS == 0), get_escenas_values(path)[i[:8]], 0)
+            #RS_DRY = np.where((RS_DRY == 1) | (RS_DRY == 255), 0, RS_DRY)
+            #Validas
+            RS_VALID = RS_DRY + RS_FLOOD
             
             profile = src.meta
             profile.update(dtype=rasterio.float32)
 
-            with rasterio.open(out, 'w', **profile) as dst:
-                dst.write(RS.astype(rasterio.float32))
+            with rasterio.open(out_flood, 'w', **profile) as dst:
+                dst.write(RS_FLOOD.astype(rasterio.float32))
+            with rasterio.open(out_dry, 'w', **profile) as dst:
+                dst.write(RS_DRY.astype(rasterio.float32))
+            with rasterio.open(out_valid, 'w', **profile) as dst:
+                dst.write(RS_VALID.astype(rasterio.float32))
+                
+                
+def get_products(path):
+    
+    
+    floods = [os.path.join(path, i) for i in os.listdir(path) if i.endswith('_flood_rec.tif')]
+    print(floods)
+    #dry = [os.path.join(path, i) for i in os.listdir(path) if i.endswith('_dry_rec.tif')]
+    valids = [os.path.join(path, i) for i in os.listdir(path) if i.endswith('_valid_rec.tif')]
+                
+            
+    out_flood = os.path.join(os.path.split(path)[0], 'hydroperiod.tif')
+    out_valid = os.path.join(os.path.split(path)[0], 'valid_days.tif')
+    
+    #Generate the hydroperiod and valid days bands
+    shape = rasterio.open(floods[0]).read().shape
+    zerosf = np.zeros(shape)
+    zerosv = np.zeros(shape)
+    
+    for i in floods:
+        arrf = rasterio.open(i).read()
+        zerosf += arrf
+    for i in valids:
+        arrv = rasterio.open(i).read()
+        zerosv += arrv
+    
+    meta = rasterio.open(floods[0]).meta
+    #meta.update(count=len(floods))
+    
+    with rasterio.open(out_flood, 'w', **meta) as dst:
+        dst.write(zerosf.astype(rasterio.float32))
+    with rasterio.open(out_valid, 'w', **meta) as dst:
+        dst.write(zerosv.astype(rasterio.float32))
+    
