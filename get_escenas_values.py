@@ -96,12 +96,17 @@ def get_products(path):
     
     #Generate the hydroperiod and valid days bands
     shape = rasterio.open(floods[0]).read().shape
+    
+    #Generate zeros arrays to fill with the correct values
     zerosf = np.zeros(shape)
     zerosv = np.zeros(shape)
+    first = np.zeros(shape)
+    last = np.zeros(shape)
     
     for i in floods:
         arrf = rasterio.open(i).read()
         zerosf += arrf
+        #first np.where((arrf != 0) & (arrf != 255), 
     for i in valids:
         arrv = rasterio.open(i).read()
         zerosv += arrv
